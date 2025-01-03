@@ -17,3 +17,6 @@ Experiment with different model parameters to enhance accuracy.
 
 # Project2 :
 differentiate between pytorch and tensorflow with CNN implementation
+
+# Project3:
+comparing DL techniques like FNN,CNN,RNN,GAN,Autoencoder
