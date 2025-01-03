@@ -14,3 +14,6 @@ Compile and train the neural network on a dataset.
 Evaluate the model's performance using test data.
 
 Experiment with different model parameters to enhance accuracy.
+
+# Project2 :
+differentiate between pytorch and tensorflow with CNN implementation
