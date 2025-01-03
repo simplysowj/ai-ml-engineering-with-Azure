@@ -1,4 +1,4 @@
-# ai-ml-engineering-with-Azure
+# AI-ml-engineering-with-Azure
 projects which includes pytorch,tensorflow and AI models
 
 # Project1 with Tensorflow:
