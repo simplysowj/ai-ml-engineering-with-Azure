@@ -1,0 +1,344 @@
+# Import necessary libraries
+import pandas as pd
+from sklearn.datasets import fetch_20newsgroups
+from sklearn.model_selection import train_test_split
+from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments
+from datasets import Dataset
+
+# Load sample dataset from scikit-learn (3 categories for faster training)
+categories = ['sci.space', 'rec.autos', 'comp.graphics']
+newsgroups = fetch_20newsgroups(subset='all', categories=categories)
+data = pd.DataFrame({'text': newsgroups.data, 'label': newsgroups.target})
+
+# Split data into train, validation, and test sets
+train_data, temp_data = train_test_split(data, test_size=0.3, random_state=42)
+val_data, test_data = train_test_split(temp_data, test_size=0.5, random_state=42)
+
+print(f"Training set size: {len(train_data)}")
+print(f"Validation set size: {len(val_data)}")
+print(f"Test set size: {len(test_data)}")
+
+``````````
+# Load tokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+# Tokenization function
+def tokenize_function(examples):
+    return tokenizer(examples['text'], 
+                    padding="max_length",
+                    truncation=True,
+                    max_length=512)
+
+# Convert to Datasets and tokenize
+train_dataset = Dataset.from_pandas(train_data)
+val_dataset = Dataset.from_pandas(val_data)
+test_dataset = Dataset.from_pandas(test_data)
+
+# Apply tokenization
+train_dataset = train_dataset.map(tokenize_function, batched=True)
+val_dataset = val_dataset.map(tokenize_function, batched=True)
+test_dataset = test_dataset.map(tokenize_function, batched=True)
+
+# Keep only necessary columns
+columns_to_remove = [col for col in train_dataset.column_names 
+                    if col not in ['input_ids', 'attention_mask', 'label']]
+train_dataset = train_dataset.remove_columns(columns_to_remove)
+val_dataset = val_dataset.remove_columns(columns_to_remove)
+test_dataset = test_dataset.remove_columns(columns_to_remove)
+
+# Create a small sample for demonstration (2.5% of training data)
+train_sample = train_dataset.shuffle(seed=42).select(range(int(0.025 * len(train_dataset))))
+
+print("\nDataset format:")
+print(train_sample[0])
+print(f"\nSample size: {len(train_sample)} examples")
+
+``````````
+from transformers import BertForSequenceClassification, Trainer, TrainingArguments
+from transformers import DataCollatorWithPadding
+
+# Initialize BERT model
+model = BertForSequenceClassification.from_pretrained(
+    'bert-base-uncased',
+    num_labels=3
+)
+
+# Change num_train_epochs=1 to complete more quickly although results may be affected
+# Define training arguments
+training_args = TrainingArguments(
+    output_dir='./results_traditional',
+    num_train_epochs=1,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    evaluation_strategy="epoch",
+    logging_dir='./logs',
+    logging_steps=10,
+    learning_rate=2e-5,
+    report_to="none"  # Disable wandb logging
+)
+
+# Initialize data collator
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+# Initialize Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_sample,
+    eval_dataset=val_dataset,
+    data_collator=data_collator,
+)
+
+``````````
+# Train the model
+train_result = trainer.train()
+
+print("\nTraining completed!")
+print(f"Training loss: {train_result.training_loss}")
+
+# Save the traditional model
+model.save_pretrained("./traditional_model")
+
+``````````
+python
+!pip install peft
+from transformers import BertForSequenceClassification, Trainer, TrainingArguments
+from peft import LoraConfig, get_peft_model, TaskType
+import torch
+from transformers import DataCollatorWithPadding
+
+# Initialize BERT model
+base_model = BertForSequenceClassification.from_pretrained(
+    'bert-base-uncased',
+    num_labels=3
+)
+
+# Define LoRA configuration
+lora_config = LoraConfig(
+    r=8,                     # Rank of the update matrices
+    lora_alpha=16,          # Alpha scaling factor
+    target_modules=["query", "key", "value"],  # Apply LoRA to attention layers
+    lora_dropout=0.1,      # Dropout probability for LoRA layers
+    bias="none",           # Don't train bias terms
+    task_type=TaskType.SEQ_CLS,  # Sequence classification task
+)
+
+# Create LoRA model
+model = get_peft_model(base_model, lora_config)
+print("Trainable parameters:")
+model.print_trainable_parameters()
+
+# Use num_train_epochs=1 to save time although results may be affected
+# Define training arguments
+training_args = TrainingArguments(
+    output_dir='./results_lora',
+    num_train_epochs=1,
+    per_device_train_batch_size=8,
+    per_device_eval_batch_size=8,
+    evaluation_strategy="epoch",
+    logging_dir='./logs_lora',
+    logging_steps=10,
+    learning_rate=2e-4,  # Slightly higher learning rate for LoRA
+    report_to="none"    # Disable wandb logging
+)
+
+# Initialize data collator
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+# Initialize Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_sample,
+    eval_dataset=val_dataset,
+    data_collator=data_collator,
+)
+
+# Train the model
+train_result = trainer.train()
+
+print("\nLoRA Training completed!")
+print(f"Training loss: {train_result.training_loss}")
+
+# Save the LoRA model
+model.save_pretrained("./lora_model")
+
+``````````
+from transformers import BertForSequenceClassification, Trainer, TrainingArguments
+from peft import LoraConfig, get_peft_model, TaskType
+import torch
+
+# Initialize BERT model
+base_model = BertForSequenceClassification.from_pretrained(
+    'bert-base-uncased',
+    num_labels=3
+)
+
+# Define LoRA configuration with explicit layer names
+target_modules = [
+    # Layer 0
+    "bert.encoder.layer.0.attention.self.query",
+    "bert.encoder.layer.0.attention.self.key",
+    "bert.encoder.layer.0.attention.self.value",
+    # Layer 1
+    "bert.encoder.layer.1.attention.self.query",
+    "bert.encoder.layer.1.attention.self.key",
+    "bert.encoder.layer.1.attention.self.value",
+]
+
+lora_config = LoraConfig(
+    r=8,  # Rank
+    lora_alpha=16,
+    target_modules=target_modules,
+    lora_dropout=0.1,
+    bias="none",
+    task_type=TaskType.SEQ_CLS,
+    inference_mode=False,
+)
+
+# Apply LoRA
+model = get_peft_model(base_model, lora_config)
+print("\nTrainable parameters:")
+model.print_trainable_parameters()
+
+# Use num_train_epochs=1 to save time although results may be affected
+# Define training arguments for CPU
+training_args = TrainingArguments(
+    output_dir='./results_qlora',
+    num_train_epochs=1,
+    per_device_train_batch_size=4,  # Reduced batch size for CPU
+    per_device_eval_batch_size=4,
+    evaluation_strategy="epoch",
+    logging_dir='./logs_qlora',
+    logging_steps=10,
+    learning_rate=3e-4,
+    report_to="none",
+    # Disable GPU/FP16 options
+    no_cuda=True,
+    fp16=False,
+    fp16_full_eval=False,
+    # Add gradient checkpointing for memory efficiency
+    gradient_checkpointing=True,
+    # Reduce memory usage
+    dataloader_num_workers=0,
+    dataloader_pin_memory=False,
+)
+
+# Initialize data collator
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+# Initialize Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=train_sample,
+    eval_dataset=val_dataset,
+    data_collator=data_collator,
+)
+
+# Train the model
+print("Starting training...")
+train_result = trainer.train()
+
+print("\nQLoRA Training completed!")
+print(f"Training loss: {train_result.training_loss}")
+
+# Save the trained model
+model.save_pretrained("./qlora_model")
+
+``````````
+import os
+import torch
+import psutil
+from transformers import BertForSequenceClassification
+from peft import LoraConfig, get_peft_model
+
+def evaluate_model(model, dataset, batch_size=4):
+    model.eval()
+    all_preds = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for i in range(0, len(dataset), batch_size):
+            batch = dataset[i:i + batch_size]
+            inputs = {
+                k: torch.tensor(batch[k]) 
+                for k in ['input_ids', 'attention_mask']
+            }
+            labels = torch.tensor(batch['label'])
+            
+            outputs = model(**inputs)
+            predictions = outputs.logits.argmax(-1)
+            
+            all_preds.extend(predictions.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+    
+    from sklearn.metrics import classification_report
+    return classification_report(all_labels, all_preds)
+
+def get_directory_size(path):
+    """Get size of all files in directory"""
+    total = 0
+    if os.path.exists(path):
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                total += os.path.getsize(fp)
+    return total / (1024 * 1024)  # Convert to MB
+
+# First, let's check what files we actually have
+print("\nChecking available model files:")
+print("Traditional model path exists:", os.path.exists('./traditional_model'))
+print("LoRA model path exists:", os.path.exists('./lora_model'))
+print("CPU-Efficient model path exists:", os.path.exists('./qlora_model'))
+
+# Print contents of each directory
+def print_directory_contents(path):
+    if os.path.exists(path):
+        print(f"\nContents of {path}:")
+        for item in os.listdir(path):
+            print(f"- {item}")
+
+print_directory_contents('./traditional_model')
+print_directory_contents('./lora_model')
+print_directory_contents('./qlora_model')
+
+# Evaluate models
+print("\nEvaluating models...")
+model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=3)
+print("\nTraditional Model Evaluation:")
+print(evaluate_model(model, test_dataset))
+
+# Calculate model sizes
+base_model_size = 438  # BERT base model size in MB
+
+# Get saved weights sizes
+trad_size = get_directory_size('./results_traditional') + base_model_size
+lora_size = get_directory_size('./lora_model') + base_model_size
+eff_size = get_directory_size('./qlora_model') + base_model_size
+
+print("\nModel Size Comparison (including base model):")
+print(f"Traditional fine-tuning: {trad_size:.2f} MB")
+print(f"LoRA: {lora_size:.2f} MB")
+print(f"QLoRA: {eff_size:.2f} MB")
+
+# Show parameter counts
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+print("\nTrainable Parameters:")
+print(f"Traditional: {count_parameters(model):,}")
+
+# Load and count LoRA parameters
+base_model = BertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=3)
+if os.path.exists('./lora_model'):
+    lora_model = get_peft_model(base_model, LoraConfig.from_pretrained('./lora_model'))
+    print(f"LoRA: {count_parameters(lora_model):,}")
+
+if os.path.exists('./qlora_model'):
+    eff_model = get_peft_model(base_model, LoraConfig.from_pretrained('./qlora_model'))
+    print(f"QLoRA: {count_parameters(eff_model):,}")
+
+print("\nMemory Usage During Inference:")
+process = psutil.Process()
+print(f"Current Process Memory: {process.memory_info().rss / (1024 * 1024):.2f} MB")

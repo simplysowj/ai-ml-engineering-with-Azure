@@ -1,0 +1,101 @@
+# Install modules
+# A '!' in a Jupyter Notebook runs the line in the system's shell, and not in the Python interpreter
+!pip install nltk
+
+# Import necessary libraries
+import pandas as pd
+import nltk
+import random
+import torch
+
+# Load dataset 
+# you can download this dataset from https://huggingface.co/datasets/stepp1/tweet_emotion_intensity/tree/main
+data = pd.read_csv('data/tweet_emotion_intensity.csv')
+
+# Preview the data
+print(data.head())
+
+``````````
+# Text preprocessing function
+import re
+
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'\[.*?\]', '', text)  # Remove text in square brackets
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)  # Remove URLs
+    text = re.sub(r'<.*?>+', '', text)  # Remove HTML tags
+    text = re.sub(r'[^a-z\s]', '', text)  # Remove non-alphabet characters
+    return text
+
+# Apply cleaning function
+data['cleaned_text'] = data['tweet'].apply(clean_text)
+
+# Tokenize using BERT tokenizer
+from transformers import BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+tokens = tokenizer(data['cleaned_text'].tolist(), max_length=128, padding=True, truncation=True, return_tensors="pt")
+
+``````````
+from sklearn.model_selection import train_test_split
+
+# Split the dataset into training (70%), validation (15%), and test (15%) sets
+train_data, temp_data = train_test_split(data, test_size=0.3, stratify=data['sentiment_intensity'])
+val_data, test_data = train_test_split(temp_data, test_size=0.5, stratify=temp_data['sentiment_intensity'])
+
+print(f"Training samples: {len(train_data)}")
+print(f"Validation samples: {len(val_data)}")
+print(f"Test samples: {len(test_data)}")
+
+``````````
+# If this is your first time using wordnet, download it
+nltk.download('wordnet')
+from nltk.corpus import wordnet
+
+def synonym_replacement(word):
+    synonyms = wordnet.synsets(word)
+    if synonyms:
+        return synonyms[0].lemmas()[0].name()
+    return word
+
+# Apply synonym replacement on random words in the dataset
+def augment_text(text):
+    words = text.split()
+    augmented_words = [synonym_replacement(word) if random.random() > 0.8 else word for word in words]
+    return ' '.join(augmented_words)
+
+# Apply augmentation
+data['augmented_text'] = data['cleaned_text'].apply(augment_text)
+
+``````````
+# Prepare inputs for fine-tuning
+from torch.utils.data import DataLoader, TensorDataset
+import torch
+
+# Convert inputs and labels into PyTorch tensors
+input_ids = tokens['input_ids']
+attention_masks = tokens['attention_mask']
+
+# Define a mapping function
+def map_sentiment(value):
+    if value == "high":
+        return 1
+    elif value == "medium":
+        return 0.5
+    elif value == "low":
+        return 0
+    else:
+        return None  # Handle unexpected values, if any
+
+# Apply the function to each item in 'sentiment_intensity'
+data['sentiment_intensity'] = data['sentiment_intensity'].apply(map_sentiment)
+
+# Drop any rows where 'sentiment_intensity' is None
+data = data.dropna(subset=['sentiment_intensity']).reset_index(drop=True)
+
+# Convert the 'sentiment_intensity' column to a tensor
+labels = torch.tensor(data['sentiment_intensity'].tolist())
+
+# Create DataLoader for training
+dataset = TensorDataset(input_ids, attention_masks, labels)
+dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
