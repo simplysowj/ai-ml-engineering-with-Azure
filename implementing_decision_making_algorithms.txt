@@ -1,0 +1,54 @@
+!pip install scikit-learn
+!pip install pandas
+
+``````````
+from sklearn.datasets import load_iris
+import pandas as pd
+
+# Load the Iris dataset into a DataFrame
+data = load_iris()
+df = pd.DataFrame(data.data, columns=data.feature_names)
+df['target'] = data.target
+
+# Explore the dataset structure
+print(df.head())
+print(df.info())
+
+``````````
+from sklearn.model_selection import train_test_split
+
+# Check for missing values (fill if necessary, though the Iris dataset has none)
+df.fillna(df.median(), inplace=True)
+
+# Define features and labels
+X = df.drop('target', axis=1)
+y = df['target']
+
+# Split into training and testing sets (80-20 split)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+``````````
+from sklearn.tree import DecisionTreeClassifier
+
+# Initialize and train the model
+tree = DecisionTreeClassifier(random_state=42)
+tree.fit(X_train, y_train)
+
+# Make predictions
+y_pred = tree.predict(X_test)
+
+``````````
+from sklearn.metrics import accuracy_score
+
+# Calculate and display accuracy
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Decision Tree Accuracy: {accuracy * 100:.2f}%")
+
+``````````
+from sklearn.tree import plot_tree
+import matplotlib.pyplot as plt
+
+# Plot the decision tree
+plt.figure(figsize=(12,8))
+plot_tree(tree, filled=True, feature_names=data.feature_names, class_names=data.target_names)
+plt.show()
