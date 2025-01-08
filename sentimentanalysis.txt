@@ -1,0 +1,16 @@
+from transformers import pipeline
+
+# Initialize a pretrained sentiment analysis model
+sentiment_analyzer = pipeline('sentiment-analysis')
+
+# Sample customer reviews
+reviews = [
+    "The battery life on this phone is amazing!",
+    "I hate the camera quality. It’s so disappointing.",
+    "The design is okay, but nothing special."
+]
+
+# Run sentiment analysis
+for review in reviews:
+    result = sentiment_analyzer(review)
+    print(f"Review: {review} -> Sentiment: {result[0]['label']}, Score: {result[0]['score']:.2f}")
