@@ -1,0 +1,87 @@
+!pip install nltk spacy transformers
+
+``````````
+# Import the Natural Language Toolkit (nltk) library
+import nltk
+
+# Import the word_tokenize function for tokenizing text
+from nltk.tokenize import word_tokenize
+
+# Sample query
+query = "My laptop is overheating after the latest update." # Define a sample sentence to work with
+
+# Tokenize the query into individual words
+tokens = word_tokenize(query) # Split the sentence into words (tokens)
+print("Tokens:", tokens) # Print the list of tokens (words)
+
+``````````
+# Apply POS tagging
+tagged_tokens = nltk.pos_tag(tokens)
+print("POS Tagged Tokens:", tagged_tokens)
+
+``````````
+import spacy # Import the spaCy library for natural language processing
+
+# Load the pretrained spaCy model for Named Entity Recognition (NER)
+nlp = spacy.load("en_core_web_sm") # Load a small English model that includes capabilities for NER
+
+# Sample query
+query = "John purchased a new laptop from Best Buy last Friday." # Define a sample sentence to analyze
+
+# Apply the spaCy model to the query to perform NER
+doc = nlp(query) # Pass the query through the model, which returns a `doc` object containing the processed text
+
+# Extract and print named entities
+for ent in doc.ents: # Iterate over all named entities recognized in the text
+    print(ent.text, ent.label_) # Print the entity text and its corresponding label (e.g., PERSON, DATE, ORG)
+
+``````````
+from transformers import pipeline # Import the `pipeline` function from the transformers library
+
+# Initialize sentiment analysis pipeline
+sentiment_analyzer = pipeline('sentiment-analysis') # Create a pipeline for sentiment analysis using a pretrained model
+
+# Sample query
+query = "My laptop is overheating after the latest update." # Define a sample sentence to analyze
+
+# Analyze the sentiment of the query
+result = sentiment_analyzer(query) # Use the sentiment analyzer to determine the sentiment of the query
+print("Sentiment Analysis:", result) # Print the result, which includes the sentiment label (e.g., positive, negative) and score
+
+``````````
+# Sample knowledge base containing common issues and their solutions
+knowledge_base = {
+"overheating": "Check your cooling system, clean the fans, and ensure proper ventilation.",
+"slow performance": "Close unnecessary applications, restart your system, and check for malware."
+}
+
+# Function to retrieve a solution based on the given issue
+def get_solution(issue):
+    # Use the `get` method to find a solution from the knowledge base
+    # If the issue is not in the knowledge base, return a default message
+    return knowledge_base.get(issue, "No solution found for this issue.")
+
+
+# Example usage to retrieve a solution for "overheating"
+print(get_solution("overheating")) # Prints the solution for the "overheating" issue
+
+``````````
+# Function to troubleshoot based on the user's query
+def troubleshoot(query):
+    # Check if the word "overheating" is in the user's query (case-insensitive)
+    if "overheating" in query.lower():
+        return get_solution("overheating") # Retrieve solution for overheating
+    # Check if the word "slow" is in the user's query (case-insensitive)    
+    elif "slow" in query.lower():
+        return get_solution("slow performance") # Retrieve solution for slow performance
+    # Check if the word "purchase" is in the user's query
+    elif "purchase" in query.lower(): 
+        return get_solution("purchase support") # Retrieve a solution for purchase support
+    # If no known keywords are found, ask for more details
+    else:
+        return "Can you provide more details about the issue?" # Default response for unknown issues
+
+# Example usage
+response = troubleshoot(query)
+print("Troubleshooting Response:", response)
+
