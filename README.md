@@ -1,5 +1,26 @@
 # AI-ml-engineering-with-Azure
 projects which includes pytorch,tensorflow and AI models
+# AI/ML Engineering with Azure 🚀
+
+A collection of deep learning projects implemented with **TensorFlow**, **PyTorch**, and **Azure ML**, covering neural networks, CNN comparisons, and advanced DL techniques.
+
+![Azure ML](https://azure.microsoft.com/svghandler/machine-learning/)
+
+---
+
+## 🛠️ Projects
+
+### **1. Neural Network with TensorFlow**  
+**Fashion MNIST Classification**  
+- Implements a neural network using TensorFlow/Keras  
+- Steps:  
+  ```python
+  1. Load & preprocess Fashion MNIST data
+  2. Design Sequential model architecture
+  3. Compile with optimizer/loss metrics
+  4. Train and evaluate on test data
+  5. Hyperparameter tuning for accuracy
+  
 
 # Project1 with Tensorflow:
 Implementing a neural network with TensorFlow 
